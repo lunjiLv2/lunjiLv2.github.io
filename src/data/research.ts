@@ -21,7 +21,7 @@ export const research: ResearchItem[] = [
     description: 'Separating the contributions of clustering and downstream trading models within a common evaluation pipeline.',
     authors: [
       { name: 'Lunji Zhu' },
-      { name: 'Yixuan He' },
+      { name: 'Yixuan He', href: 'https://sherylhyx.github.io/' },
       { name: 'Mihai Cucuringu', href: 'https://math.ucla.edu/~mihai/index.html' },
     ],
     resources: [
