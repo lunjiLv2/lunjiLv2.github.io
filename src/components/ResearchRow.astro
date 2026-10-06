@@ -10,7 +10,7 @@ const Heading = headingLevel === 2 ? 'h2' : 'h3';
   <div class="research-copy">
     <p class="research-status">{item.status}</p>
     <Heading class="research-title"><a href={item.href}>{fullTitle ? item.title : item.shortTitle}</a></Heading>
-    {item.authors && <p class="research-authors">{item.authors}</p>}
+    {item.authors && <p class="research-authors">{item.authors.map((author, index) => <>{index > 0 && ', '}{author.href ? <a href={author.href}>{author.name}</a> : author.name}</>)}</p>}
     <p class="research-description">{item.description}</p>
     <div class="resource-links">
       {item.resources.map(resource => <a href={resource.href}>{resource.label} <span aria-hidden="true">↗</span></a>)}
