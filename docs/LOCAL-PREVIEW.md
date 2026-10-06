@@ -31,6 +31,6 @@ INCLUDE_DRAFTS=true npm run build
 npm run preview
 ```
 
-The selected main-site URL is `https://lunjilv2.github.io/`, using the `lunjiLv2/lunjiLv2.github.io` repository and no project subpath. The prepared deploy workflow publishes only from `master`; the check workflow validates pull requests and development branches without deployment. Neither has been run for this release. Enable GitHub Actions as the Pages source before the first publication. The UCLA entry page is a separate follow-up after the main site is live.
+The published main-site URL is `https://lunjilv2.github.io/`, using the `lunjiLv2/lunjiLv2.github.io` repository and no project subpath. GitHub Pages is configured to use GitHub Actions. The deploy workflow publishes reviewed updates pushed to `master`; the check workflow validates pull requests and development branches without deployment. The UCLA entry page is a separate follow-up.
 
 For writing new notes and inserting components, see [AUTHORING.md](AUTHORING.md).

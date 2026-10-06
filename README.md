@@ -33,6 +33,6 @@ See [authoring instructions](docs/AUTHORING.md) and [local review notes](docs/LO
 
 ## Deployment and migration
 
-The selected site URL is `https://lunjilv2.github.io/`, hosted from `lunjiLv2/lunjiLv2.github.io`. The check workflow validates pull requests and development branches. The prepared deploy workflow installs locked dependencies, checks types, builds the static site, and deploys only from `master`. Repository Pages settings must use GitHub Actions before deployment. The workflow has not been pushed or run for the first release.
+The site is published at `https://lunjilv2.github.io/`, hosted from `lunjiLv2/lunjiLv2.github.io`. GitHub Pages uses GitHub Actions as its source. The deploy workflow installs locked dependencies, checks types, builds the static site, and deploys reviewed updates pushed to `master`. The check workflow validates pull requests and development branches without deployment.
 
 The clean release contains only the Astro site and its authorized resources. Legacy Jekyll/Academic Pages files remain in the original Git history and the local migration checkout. Their original instructions are preserved in [LEGACY-ACADEMIC-PAGES.md](docs/LEGACY-ACADEMIC-PAGES.md); original licensing and attribution remain in `LICENSE`.
