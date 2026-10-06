@@ -10,7 +10,7 @@ import { cv } from '../data/cv';
 const visibleNotes = await getVisibleNotes();
 const publishedNotes = visibleNotes.filter(note => !note.data.draft);
 const notes = (publishedNotes.length > 0 ? publishedNotes : visibleNotes).slice(0, 3);
-// Biography remains a deferred content edit at Lunji's request.
+// Biography uses the wording supplied by Lunji on October 5, 2026.
 ---
 <BaseLayout>
   <main id="main-content" class="container" tabindex="-1">
@@ -19,8 +19,8 @@ const notes = (publishedNotes.length > 0 ? publishedNotes : visibleNotes).slice(
         <p class="eyebrow">UCLA · Applied Mathematics</p>
         <h1 id="profile-name" class="profile-name">Lunji Zhu</h1>
         <div class="bio">
-          <p>I am a Ph.D. student in Applied Mathematics at <a href="https://www.math.ucla.edu/">UCLA</a>. My current work focuses on AI for mathematics and sampling algorithms. My previous research has included quantitative finance and operator learning.</p>
-          <p>Beyond my current work, I am interested in machine learning theory, reinforcement learning, data-driven methods for the social sciences, and applied stochastic analysis.</p>
+          <p>I am a Ph.D. student in Applied Mathematics at <a href="https://www.math.ucla.edu/">UCLA</a>. I am working with Prof. Andrea Bertozzi on AI for Applied Differential Equations. I also work with Prof. Mihai Cucuringu on topics on quantitative finance and with Prof. Yifan Chen on ensemble sampling.</p>
+          <p>Beyond my current work, I am interested in machine learning theory, reinforcement learning, and data-driven methods for the social sciences.</p>
         </div>
         <div class="contact-links"><a href="mailto:lunji@math.ucla.edu">Email</a><a href="https://github.com/lunjiLv2">GitHub</a>{cv.href && <a href={cv.href}>CV</a>}</div>
       </div>
