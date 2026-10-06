@@ -3,13 +3,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import { Image } from 'astro:assets';
 import portrait from '../assets/portrait.jpg';
 import ResearchRow from '../components/ResearchRow.astro';
-import NoteRow from '../components/NoteRow.astro';
 import { research } from '../data/research';
-import { getVisibleNotes } from '../lib/notes';
+import { teaching } from '../data/teaching';
 import { cv } from '../data/cv';
-const visibleNotes = await getVisibleNotes();
-const publishedNotes = visibleNotes.filter(note => !note.data.draft);
-const notes = (publishedNotes.length > 0 ? publishedNotes : visibleNotes).slice(0, 3);
+const recentTeaching = teaching.slice(0, 3);
 // Biography uses the wording supplied by Lunji on October 5, 2026.
 ---
 <BaseLayout>
@@ -30,9 +27,28 @@ const notes = (publishedNotes.length > 0 ? publishedNotes : visibleNotes).slice(
       <div class="section-heading"><h2 id="selected-research">Selected research</h2><a href="/research/">All research <span aria-hidden="true">↗</span></a></div>
       <div class="research-list">{research.map(item => <ResearchRow item={item} fullTitle />)}</div>
     </section>
-    {notes.length > 0 && <section aria-labelledby="recent-notes">
-      <div class="section-heading"><h2 id="recent-notes">Notes</h2><a href="/notes/">All notes <span aria-hidden="true">↗</span></a></div>
-      <div class="note-list">{notes.map(note => <NoteRow note={note} headingLevel={3} />)}</div>
-    </section>}
+    <section aria-labelledby="recent-teaching">
+      <div class="section-heading"><h2 id="recent-teaching">Teaching</h2><a href="/teaching/">All teaching <span aria-hidden="true">↗</span></a></div>
+      <ol class="teaching-list">
+        {recentTeaching.map(course => (
+          <li class="teaching-item">
+            <p class="teaching-term">{course.year} {course.term}</p>
+            <div class="teaching-course">
+              <h3 class="teaching-title">
+                <a href={`/teaching/#${course.slug}`}>
+                  <span class="teaching-code">{course.code}</span>
+                  {course.title}
+                </a>
+              </h3>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
   </main>
 </BaseLayout>
+
+<style>
+  .teaching-title a { color: var(--ink); text-decoration: none; }
+  .teaching-title a:hover { color: var(--accent); }
+</style>
