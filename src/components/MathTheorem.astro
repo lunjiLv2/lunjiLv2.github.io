@@ -1,0 +1,42 @@
+---
+interface Props {
+  title?: string;
+  id?: string;
+  proofTitle?: string;
+  proofOpen?: boolean;
+}
+
+const { title = 'Theorem', id, proofTitle = 'Proof', proofOpen = false } = Astro.props;
+const hasProof = Astro.slots.has('proof');
+---
+
+<section class="math-theorem" id={id} aria-label={title}>
+  <p class="theorem-title">{title}</p>
+  <div class="theorem-statement"><slot /></div>
+  {hasProof && (
+    <details class="theorem-proof" open={proofOpen}>
+      <summary>{proofTitle}</summary>
+      <div class="proof-content"><slot name="proof" /></div>
+    </details>
+  )}
+</section>
+
+<style>
+  .math-theorem {
+    margin: 2rem 0;
+    padding: 1.1rem 1.3rem;
+    border-inline-start: 3px solid var(--accent);
+    background: var(--soft);
+    color: var(--ink);
+  }
+  .theorem-title { margin: 0 0 .6rem; font-weight: 650; }
+  .theorem-statement :global(> :first-child),
+  .proof-content :global(> :first-child) { margin-top: 0; }
+  .theorem-statement :global(> :last-child),
+  .proof-content :global(> :last-child) { margin-bottom: 0; }
+  .theorem-proof { margin-top: 1rem; border-top: 1px solid var(--line); padding-top: .75rem; }
+  summary { width: fit-content; cursor: pointer; color: var(--accent); }
+  summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+  .proof-content { margin-top: .75rem; }
+  @media (max-width: 480px) { .math-theorem { padding: 1rem; } }
+</style>

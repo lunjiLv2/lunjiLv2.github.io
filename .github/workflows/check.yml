@@ -1,0 +1,36 @@
+name: Check website
+
+on:
+  pull_request:
+  push:
+    branches:
+      - 'codex/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Check types and content
+        run: npm run check
+      - name: Build static website
+        run: npm run build

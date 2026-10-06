@@ -1,0 +1,14 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import NoteRow from '../../components/NoteRow.astro';
+import { getVisibleNotes } from '../../lib/notes';
+const visibleNotes = await getVisibleNotes();
+const publishedNotes = visibleNotes.filter(note => !note.data.draft);
+const notes = publishedNotes.length > 0 ? publishedNotes : visibleNotes;
+---
+<BaseLayout title="Notes" description="Notes on mathematics, computation, and research. Written in English or Chinese.">
+  <main id="main-content" class="container" tabindex="-1">
+    <header class="page-intro"><p class="eyebrow">Mathematics and computation</p><h1>Notes</h1><p>Course notes, exam preparation, and mathematical explorations. Written in English or Chinese.</p></header>
+    {notes.length > 0 ? <div class="note-list">{notes.map(note => <NoteRow note={note} />)}</div> : <p class="empty-state">Notes will appear here as they are ready.</p>}
+  </main>
+</BaseLayout>

@@ -1,0 +1,42 @@
+---
+interface Props { kind: 'clustering' | 'ensemble' | 'differential-equations'; }
+const { kind } = Astro.props;
+const descriptions = {
+  clustering: 'A graph arranged in three connected groups.',
+  ensemble: 'An ensemble of sample points over schematic probability-density contours.',
+  'differential-equations': 'A schematic connecting differential equations, artificial intelligence, and mathematical analysis.',
+};
+const ensemblePoints = [[42, 61], [51, 78], [60, 48], [68, 65], [71, 85], [76, 38], [80, 58], [84, 74], [89, 46], [98, 65], [104, 35], [109, 55], [118, 68], [122, 42], [91, 85], [60, 76], [74, 50], [96, 57]];
+---
+<div class="research-figure">
+  <svg viewBox="0 0 160 120" role="img" aria-label={descriptions[kind]}>
+    {kind === 'clustering' && <g stroke="currentColor" stroke-width="1.4">
+      <g fill="none" opacity=".4"><path d="M30 35l20-11 14 25-34-14v31l34-17-11 37-23-20M99 27l31 13-8 28-29-15 6-26 23 41M67 83l32-3 17 22-29 2-20-21M64 49l29 4M53 86l14-3M99 80l23-12" /></g>
+      <g fill="currentColor" stroke="none"><circle cx="30" cy="35" r="4" /><circle cx="50" cy="24" r="4" /><circle cx="64" cy="49" r="4" /><circle cx="30" cy="66" r="4" /><circle cx="53" cy="86" r="4" /><circle cx="99" cy="27" r="4" /><circle cx="130" cy="40" r="4" /><circle cx="122" cy="68" r="4" /><circle cx="93" cy="53" r="4" /><circle cx="67" cy="83" r="4" /><circle cx="99" cy="80" r="4" /><circle cx="116" cy="102" r="4" /><circle cx="87" cy="104" r="4" /></g>
+    </g>}
+    {kind === 'ensemble' && <g style="color: var(--accent)">
+      <g fill="currentColor" fill-opacity=".025" stroke="currentColor" stroke-width="1.2" stroke-opacity=".28" transform="rotate(-18 80 62)">
+        <ellipse cx="80" cy="62" rx="61" ry="37" />
+        <ellipse cx="80" cy="62" rx="44" ry="26" />
+        <ellipse cx="80" cy="62" rx="26" ry="15" />
+      </g>
+      <g fill="currentColor" fill-opacity=".8">
+        {ensemblePoints.map(([cx, cy]) => <circle cx={cx} cy={cy} r="2.8" />)}
+      </g>
+    </g>}
+    {kind === 'differential-equations' && <g stroke-width="1.2">
+      <g fill="none" stroke="currentColor" stroke-opacity=".3">
+        <path d="M46 42L43 83M109 42l10 41M59 97h47" />
+        <rect x="25" y="12" width="105" height="32" rx="5" />
+        <rect x="20" y="83" width="42" height="29" rx="5" />
+        <rect x="105" y="83" width="39" height="29" rx="5" />
+      </g>
+      <text x="77.5" y="33" text-anchor="middle" fill="currentColor" font-family="var(--font-headings)" font-size="17">∂u/∂t = L(u)</text>
+      <text x="41" y="103" text-anchor="middle" fill="var(--accent)" font-family="var(--font-sans)" font-size="16" font-weight="500">AI</text>
+      <g fill="none" stroke="var(--accent)">
+        <path d="M113 90v15h24" stroke-opacity=".35" />
+        <path d="M114 102c5-1 6-10 11-10s6 11 12 6" stroke-linecap="round" />
+      </g>
+    </g>}
+  </svg>
+</div>

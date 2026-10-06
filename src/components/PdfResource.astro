@@ -1,0 +1,299 @@
+---
+interface Props {
+  href: string;
+  title: string;
+  date?: string;
+  preview?: boolean;
+  id?: string;
+}
+
+const { href, title, date, preview = true, id = 'pdf-resource' } = Astro.props;
+---
+
+<pdf-resource class="pdf-resource">
+  <div class="pdf-heading">
+    <p class="pdf-title">{title}</p>
+    {date && <time datetime={date}>{date}</time>}
+  </div>
+  <div class="pdf-actions">
+    <a data-pdf-link href={href} target="_blank" rel="noopener">Open PDF<span class="sr-only"> in a new tab</span></a>
+    <a href={href} download>Download</a>
+    {preview && (
+      <button type="button" data-pdf-toggle aria-expanded="false" aria-controls={`${id}-preview`}>
+        Preview PDF
+      </button>
+    )}
+  </div>
+  {preview && <div class="pdf-preview" id={`${id}-preview`} data-pdf-preview data-pdf-title={title} hidden>
+    <div class="pdf-reader-controls">
+      <button type="button" data-pdf-previous disabled>Previous</button>
+      <p class="pdf-reader-status" data-pdf-status role="status" aria-live="polite" aria-atomic="true">Loading PDF…</p>
+      <button type="button" data-pdf-next disabled>Next</button>
+      <form class="pdf-page-form" data-pdf-page-form>
+        <label for={`${id}-page`}>Go to page</label>
+        <input id={`${id}-page`} data-pdf-page-input type="number" inputmode="numeric" min="1" value="1" required disabled />
+        <button type="submit" data-pdf-go disabled>Go</button>
+      </form>
+    </div>
+    <p class="pdf-reader-help">For text selection and search, <a href={href} target="_blank" rel="noopener">open the PDF</a>.</p>
+    <div class="pdf-canvas-wrap" data-pdf-canvas-wrap>
+      <canvas data-pdf-canvas role="img" tabindex="0" aria-label={`${title} — PDF page preview`} hidden />
+    </div>
+  </div>}
+</pdf-resource>
+
+<script>
+  import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
+
+  class PdfResource extends HTMLElement {
+    private toggle?: HTMLButtonElement;
+    private panel?: HTMLDivElement;
+    private status?: HTMLParagraphElement;
+    private previous?: HTMLButtonElement;
+    private next?: HTMLButtonElement;
+    private go?: HTMLButtonElement;
+    private form?: HTMLFormElement;
+    private input?: HTMLInputElement;
+    private canvas?: HTMLCanvasElement;
+    private canvasWrap?: HTMLDivElement;
+    private pdf?: PDFDocumentProxy;
+    private loadingTask?: PDFDocumentLoadingTask;
+    private renderTask?: RenderTask;
+    private observer?: ResizeObserver;
+    private resizeTimer?: ReturnType<typeof setTimeout>;
+    private connectionVersion = 0;
+    private pageNumber = 1;
+    private renderedWidth = 0;
+    private busy = false;
+    private resizePending = false;
+
+    private setStatus(message: string) {
+      if (this.status) this.status.textContent = message;
+    }
+
+    private updateControls() {
+      const unavailable = this.busy || !this.pdf;
+      if (this.previous) this.previous.disabled = unavailable || this.pageNumber <= 1;
+      if (this.next) this.next.disabled = unavailable || this.pageNumber >= (this.pdf?.numPages ?? 1);
+      if (this.go) this.go.disabled = unavailable;
+      if (this.input) this.input.disabled = unavailable;
+      this.panel?.setAttribute('aria-busy', String(this.busy));
+    }
+
+    private togglePreview = () => {
+      if (!this.toggle || !this.panel) return;
+      const show = this.panel.hidden;
+      this.panel.hidden = !show;
+      this.toggle.setAttribute('aria-expanded', String(show));
+      this.toggle.textContent = show ? 'Close preview' : 'Preview PDF';
+      if (show && !this.busy) {
+        if (!this.pdf) void this.loadDocument();
+        else this.scheduleResize();
+      }
+    };
+
+    private async loadDocument() {
+      const href = this.querySelector<HTMLAnchorElement>('[data-pdf-link]')?.href;
+      if (!href || !this.canvas || !this.panel) return;
+      const version = this.connectionVersion;
+      this.busy = true;
+      this.updateControls();
+      this.setStatus('Loading PDF…');
+      try {
+        const [pdfjs, worker] = await Promise.all([
+          import('pdfjs-dist'),
+          import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
+        ]);
+        if (!this.isConnected || version !== this.connectionVersion) return;
+        pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+        this.loadingTask = pdfjs.getDocument({ url: href });
+        const pdf = await this.loadingTask.promise;
+        if (!this.isConnected || version !== this.connectionVersion) {
+          void pdf.loadingTask.destroy().catch(() => {});
+          return;
+        }
+        this.pdf = pdf;
+        if (this.input) this.input.max = String(this.pdf.numPages);
+        await this.renderPage(this.pageNumber);
+      } catch {
+        if (this.isConnected && version === this.connectionVersion) {
+          this.setStatus('Preview could not load. Please use Open PDF above.');
+          const failedTask = this.loadingTask;
+          this.loadingTask = undefined;
+          this.pdf = undefined;
+          void failedTask?.destroy().catch(() => {});
+        }
+      } finally {
+        if (version === this.connectionVersion) {
+          this.busy = false;
+          this.updateControls();
+        }
+      }
+    }
+
+    private async renderPage(pageNumber: number) {
+      if (!this.pdf || !this.canvas || !this.canvasWrap || this.panel?.hidden || this.renderTask) return;
+      const width = Math.floor(this.canvasWrap.clientWidth);
+      if (width < 1) return;
+      const version = this.connectionVersion;
+      this.busy = true;
+      this.updateControls();
+      this.setStatus(`Loading page ${pageNumber}…`);
+      try {
+        const page = await this.pdf.getPage(pageNumber);
+        if (!this.isConnected || version !== this.connectionVersion) return;
+        const initialViewport = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({ scale: width / initialViewport.width });
+        const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+        this.canvas.width = Math.ceil(viewport.width * outputScale);
+        this.canvas.height = Math.ceil(viewport.height * outputScale);
+        this.canvas.style.width = `${viewport.width}px`;
+        this.canvas.style.height = `${viewport.height}px`;
+        this.canvas.hidden = false;
+        this.renderTask = page.render({
+          canvas: this.canvas,
+          viewport,
+          transform: outputScale === 1 ? undefined : [outputScale, 0, 0, outputScale, 0, 0],
+        });
+        await this.renderTask.promise;
+        if (!this.isConnected || version !== this.connectionVersion) return;
+        this.pageNumber = pageNumber;
+        this.renderedWidth = width;
+        if (this.input) this.input.value = String(pageNumber);
+        this.canvas.setAttribute('aria-label', `${this.panel?.dataset.pdfTitle ?? 'Document'} — page ${pageNumber} of ${this.pdf.numPages}. Use Open PDF for accessible document text.`);
+        this.setStatus(`Page ${pageNumber} of ${this.pdf.numPages}`);
+      } catch {
+        if (this.isConnected && version === this.connectionVersion) {
+          this.setStatus('This page could not load. Please use Open PDF above.');
+        }
+      } finally {
+        if (version === this.connectionVersion) {
+          this.renderTask = undefined;
+          this.busy = false;
+          this.updateControls();
+          if (this.resizePending) {
+            this.resizePending = false;
+            this.scheduleResize();
+          }
+        }
+      }
+    }
+
+    private changePage(pageNumber: number) {
+      if (this.busy || !this.pdf || pageNumber < 1 || pageNumber > this.pdf.numPages) return;
+      if (pageNumber === this.pageNumber && this.renderedWidth > 0) return;
+      void this.renderPage(pageNumber);
+    }
+
+    private goPrevious = () => this.changePage(this.pageNumber - 1);
+    private goNext = () => this.changePage(this.pageNumber + 1);
+    private goToPage = (event: SubmitEvent) => {
+      event.preventDefault();
+      if (!this.input?.reportValidity()) return;
+      const pageNumber = this.input.valueAsNumber;
+      if (Number.isInteger(pageNumber)) this.changePage(pageNumber);
+    };
+    private handleKeys = (event: KeyboardEvent) => {
+      if ((event.target as HTMLElement).closest('input, button, a')) return;
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        this.changePage(this.pageNumber + (event.key === 'ArrowLeft' ? -1 : 1));
+      }
+    };
+    private scheduleResize = () => {
+      if (!this.pdf || this.panel?.hidden || !this.canvasWrap) return;
+      const width = Math.floor(this.canvasWrap.clientWidth);
+      if (width < 1 || width === this.renderedWidth) return;
+      if (this.busy) {
+        this.resizePending = true;
+        return;
+      }
+      clearTimeout(this.resizeTimer);
+      this.resizeTimer = setTimeout(() => {
+        if (this.busy) this.resizePending = true;
+        else void this.renderPage(this.pageNumber);
+      }, 120);
+    };
+
+    connectedCallback() {
+      this.connectionVersion += 1;
+      this.toggle = this.querySelector<HTMLButtonElement>('[data-pdf-toggle]') ?? undefined;
+      this.panel = this.querySelector<HTMLDivElement>('[data-pdf-preview]') ?? undefined;
+      this.status = this.querySelector<HTMLParagraphElement>('[data-pdf-status]') ?? undefined;
+      this.previous = this.querySelector<HTMLButtonElement>('[data-pdf-previous]') ?? undefined;
+      this.next = this.querySelector<HTMLButtonElement>('[data-pdf-next]') ?? undefined;
+      this.go = this.querySelector<HTMLButtonElement>('[data-pdf-go]') ?? undefined;
+      this.form = this.querySelector<HTMLFormElement>('[data-pdf-page-form]') ?? undefined;
+      this.input = this.querySelector<HTMLInputElement>('[data-pdf-page-input]') ?? undefined;
+      this.canvas = this.querySelector<HTMLCanvasElement>('[data-pdf-canvas]') ?? undefined;
+      this.canvasWrap = this.querySelector<HTMLDivElement>('[data-pdf-canvas-wrap]') ?? undefined;
+      this.toggle?.addEventListener('click', this.togglePreview);
+      this.previous?.addEventListener('click', this.goPrevious);
+      this.next?.addEventListener('click', this.goNext);
+      this.form?.addEventListener('submit', this.goToPage);
+      this.panel?.addEventListener('keydown', this.handleKeys);
+      if (this.canvasWrap) {
+        this.observer = new ResizeObserver(this.scheduleResize);
+        this.observer.observe(this.canvasWrap);
+      }
+      this.updateControls();
+    }
+
+    disconnectedCallback() {
+      this.connectionVersion += 1;
+      this.toggle?.removeEventListener('click', this.togglePreview);
+      this.previous?.removeEventListener('click', this.goPrevious);
+      this.next?.removeEventListener('click', this.goNext);
+      this.form?.removeEventListener('submit', this.goToPage);
+      this.panel?.removeEventListener('keydown', this.handleKeys);
+      this.observer?.disconnect();
+      clearTimeout(this.resizeTimer);
+      this.renderTask?.cancel();
+      void this.loadingTask?.destroy().catch(() => {});
+      this.loadingTask = undefined;
+      this.pdf = undefined;
+      this.renderTask = undefined;
+      this.busy = false;
+      this.resizePending = false;
+      this.renderedWidth = 0;
+      this.pageNumber = 1;
+      if (this.canvas) {
+        this.canvas.width = 0;
+        this.canvas.height = 0;
+        this.canvas.hidden = true;
+      }
+      if (this.panel) this.panel.hidden = true;
+      this.toggle?.setAttribute('aria-expanded', 'false');
+      if (this.toggle) this.toggle.textContent = 'Preview PDF';
+    }
+  }
+
+  if (!customElements.get('pdf-resource')) customElements.define('pdf-resource', PdfResource);
+</script>
+
+<style>
+  .pdf-resource { display: block; margin: 1.7rem 0; border: 1px solid var(--line); padding: 1rem 1.2rem; }
+  .pdf-heading { display: flex; gap: .8rem; flex-wrap: wrap; justify-content: space-between; align-items: baseline; }
+  .pdf-title { color: var(--ink); font-weight: 600; margin: 0; }
+  time { color: var(--muted); font-size: .85rem; }
+  .pdf-actions { display: flex; flex-wrap: wrap; gap: .65rem 1.2rem; align-items: center; margin-top: .55rem; }
+  button { border: 0; padding: 0; color: var(--accent); background: transparent; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+  button:disabled { color: var(--muted); cursor: default; text-decoration: none; }
+  .pdf-preview { margin-top: 1rem; }
+  .pdf-preview[hidden] { display: none; }
+  .pdf-reader-controls { display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: center; padding-block: .65rem; border-block: 1px solid var(--line); }
+  .pdf-reader-status { margin: 0; color: var(--muted); font-size: .85rem; }
+  .pdf-page-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-left: auto; font-size: .85rem; }
+  .pdf-page-form input { width: 4.5rem; min-width: 0; padding: .25rem .4rem; border: 1px solid var(--line); border-radius: 0; color: var(--ink); background: var(--background); font: inherit; }
+  .pdf-page-form input:focus-visible, canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .pdf-reader-help { margin: .7rem 0; color: var(--muted); font-size: .85rem; }
+  .pdf-canvas-wrap { width: 100%; min-width: 0; background: white; }
+  canvas { display: block; max-width: 100%; }
+  canvas[hidden] { display: none; }
+  @media (max-width: 520px) {
+    .pdf-resource { padding: .9rem; }
+    .pdf-page-form { margin-left: 0; flex-basis: 100%; }
+  }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+</style>

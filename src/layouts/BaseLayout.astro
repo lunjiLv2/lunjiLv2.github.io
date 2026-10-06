@@ -1,0 +1,151 @@
+---
+import '@fontsource/ibm-plex-sans/400.css';
+import '@fontsource/ibm-plex-sans/500.css';
+import '@fontsource/source-serif-4/400.css';
+import '@fontsource/source-serif-4/500.css';
+import 'katex/dist/katex.min.css';
+import '../styles/global.css';
+import { getVisibleNotes } from '../lib/notes';
+import { cv } from '../data/cv';
+
+interface Props {
+  title?: string;
+  description?: string;
+  lang?: string;
+  noindex?: boolean;
+}
+
+const {
+  title,
+  description = 'Lunji Zhu — research in applied mathematics at UCLA.',
+  lang = 'en',
+  noindex = false,
+} = Astro.props;
+const pageTitle = title ? `${title} · Lunji Zhu` : 'Lunji Zhu · Applied Mathematics';
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const isDev = import.meta.env.DEV;
+const showNotes = (await getVisibleNotes()).length > 0;
+const photo = Astro.url.searchParams.get('photo') === 'off' ? 'off' : 'on';
+const previewLink = (pathname: string) => {
+  if (!isDev) return pathname;
+  const url = new URL(pathname, Astro.url);
+  url.searchParams.set('photo', photo);
+  return `${url.pathname}${url.search}${url.hash}`;
+};
+const photoToggle = new URL(Astro.url);
+photoToggle.searchParams.set('photo', photo === 'on' ? 'off' : 'on');
+const isActive = (pathname: string) => Astro.url.pathname.startsWith(pathname);
+---
+
+<!doctype html>
+<html lang={lang} data-headings="serif" data-accent="blue">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    {!noindex && <meta property="og:url" content={canonical} />}
+    <meta property="og:site_name" content="Lunji Zhu" />
+    <meta name="twitter:card" content="summary" />
+    {isDev && (
+      <script is:inline>
+        try {
+          const headings = localStorage.getItem('lunji-preview-headings');
+          const accent = localStorage.getItem('lunji-preview-accent');
+          if (headings === 'serif' || headings === 'sans') document.documentElement.dataset.headings = headings;
+          if (accent === 'teal' || accent === 'blue') document.documentElement.dataset.accent = accent;
+        } catch {}
+      </script>
+    )}
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    {isDev && (
+      <aside class="design-preview" aria-label="Local design preview">
+        <div class="container design-preview-inner">
+          <span class="preview-label">本地设计预览</span>
+          <div class="preview-option" role="group" aria-label="标题字体">
+            <span>标题</span>
+            <button type="button" data-preview-headings="serif" aria-pressed="true">Serif</button>
+            <button type="button" data-preview-headings="sans" aria-pressed="false">Sans</button>
+          </div>
+          <div class="preview-option" role="group" aria-label="强调色">
+            <span>强调色</span>
+            <button type="button" data-preview-accent="teal" aria-pressed="false">Teal</button>
+            <button type="button" data-preview-accent="blue" aria-pressed="true">Blue</button>
+          </div>
+          <a data-photo-toggle href={`${photoToggle.pathname}${photoToggle.search}${photoToggle.hash}`}>
+            {photo === 'on' ? '照片位置：隐藏' : '照片位置：显示'}
+          </a>
+        </div>
+      </aside>
+    )}
+    <header class="site-header container">
+      <a class="site-name" href={previewLink('/')}>Lunji Zhu</a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href={previewLink('/research/')} aria-current={isActive('/research/') ? 'page' : undefined}>Research</a>
+        <a href={previewLink('/teaching/')} aria-current={isActive('/teaching/') ? 'page' : undefined}>Teaching</a>
+        {showNotes && <a href={previewLink('/notes/')} aria-current={isActive('/notes/') ? 'page' : undefined}>Notes</a>}
+        {cv.href && <a href={cv.href}>CV</a>}
+        <a href="mailto:lunji@math.ucla.edu">Contact</a>
+      </nav>
+    </header>
+    <slot />
+    <footer class="site-footer container">
+      <span>Lunji Zhu <span class="footer-divider" aria-hidden="true">·</span> UCLA</span>
+      <a href="https://github.com/lunjiLv2">GitHub</a>
+    </footer>
+    {isDev && (
+      <script is:inline>
+        (() => {
+          const root = document.documentElement;
+          const syncControls = () => {
+            document.querySelectorAll('[data-preview-headings]').forEach((button) => {
+              button.setAttribute('aria-pressed', String(button.dataset.previewHeadings === root.dataset.headings));
+            });
+            document.querySelectorAll('[data-preview-accent]').forEach((button) => {
+              button.setAttribute('aria-pressed', String(button.dataset.previewAccent === root.dataset.accent));
+            });
+          };
+          document.querySelectorAll('[data-preview-headings], [data-preview-accent]').forEach((button) => {
+            button.addEventListener('click', () => {
+              const key = button.hasAttribute('data-preview-headings') ? 'headings' : 'accent';
+              const value = key === 'headings' ? button.dataset.previewHeadings : button.dataset.previewAccent;
+              root.dataset[key] = value;
+              try { localStorage.setItem(`lunji-preview-${key}`, value); } catch {}
+              syncControls();
+            });
+          });
+          syncControls();
+          const photo = new URL(location.href).searchParams.get('photo') === 'off' ? 'off' : 'on';
+          const portrait = document.querySelector('.profile-portrait');
+          if (portrait) {
+            portrait.hidden = photo !== 'on';
+            document.querySelector('.home-intro')?.classList.toggle('has-portrait', photo === 'on');
+          }
+          const photoLink = document.querySelector('[data-photo-toggle]');
+          if (photoLink) {
+            const destination = new URL(location.href);
+            destination.searchParams.set('photo', photo === 'on' ? 'off' : 'on');
+            photoLink.href = `${destination.pathname}${destination.search}${destination.hash}`;
+            photoLink.textContent = photo === 'on' ? '照片位置：隐藏' : '照片位置：显示';
+          }
+          document.querySelectorAll('a[href]').forEach((link) => {
+            const href = link.getAttribute('href');
+            if (!href || href.startsWith('#') || link.hasAttribute('data-photo-toggle') || link.hasAttribute('download')) return;
+            const url = new URL(href, location.href);
+            if (url.origin !== location.origin || !['http:', 'https:'].includes(url.protocol)) return;
+            if (/\.[a-z0-9]+$/i.test(url.pathname)) return;
+            url.searchParams.set('photo', photo);
+            link.setAttribute('href', `${url.pathname}${url.search}${url.hash}`);
+          });
+        })();
+      </script>
+    )}
+  </body>
+</html>

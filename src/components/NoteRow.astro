@@ -1,0 +1,25 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { formatNoteDate, getNoteHref } from '../lib/notes';
+
+interface Props {
+  note: CollectionEntry<'notes'>;
+  headingLevel?: 2 | 3;
+}
+
+const { note, headingLevel = 2 } = Astro.props;
+const Heading = headingLevel === 3 ? 'h3' : 'h2';
+const language = note.data.lang === 'zh' ? '中文' : note.data.lang === 'en' ? 'English' : undefined;
+const metadata = [language, note.data.draft ? 'Draft' : undefined].filter(Boolean).join(' · ');
+---
+
+<article class="note-item">
+  <div>
+    {note.data.date && <time datetime={note.data.date.toISOString()}>{formatNoteDate(note.data.date)}</time>}
+    {metadata && <span class="research-status">{metadata}</span>}
+  </div>
+  <div>
+    <Heading><a href={getNoteHref(note)}>{note.data.title}{note.data.externalUrl && <span aria-hidden="true"> ↗</span>}</a></Heading>
+    <p>{note.data.description}</p>
+  </div>
+</article>

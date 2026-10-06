@@ -1,0 +1,19 @@
+---
+import ResearchFigure from './ResearchFigure.astro';
+import type { ResearchItem } from '../data/research';
+interface Props { item: ResearchItem; fullTitle?: boolean; headingLevel?: 2 | 3; }
+const { item, fullTitle = false, headingLevel = 3 } = Astro.props;
+const Heading = headingLevel === 2 ? 'h2' : 'h3';
+---
+<article class="research-item">
+  <ResearchFigure kind={item.kind} />
+  <div class="research-copy">
+    <p class="research-status">{item.status}</p>
+    <Heading class="research-title"><a href={item.href}>{fullTitle ? item.title : item.shortTitle}</a></Heading>
+    {item.authors && <p class="research-authors">{item.authors}</p>}
+    <p class="research-description">{item.description}</p>
+    <div class="resource-links">
+      {item.resources.map(resource => <a href={resource.href}>{resource.label} <span aria-hidden="true">↗</span></a>)}
+    </div>
+  </div>
+</article>

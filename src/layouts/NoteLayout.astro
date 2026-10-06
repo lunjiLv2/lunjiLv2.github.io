@@ -1,0 +1,18 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import { formatNoteDate } from '../lib/notes';
+import type { CollectionEntry } from 'astro:content';
+interface Props { note: CollectionEntry<'notes'>; }
+const { note } = Astro.props;
+const language = note.data.lang === 'zh' ? '中文' : note.data.lang === 'en' ? 'English' : undefined;
+const metadata = [language, note.data.draft ? 'Draft' : undefined].filter(Boolean).join(' · ');
+---
+<BaseLayout title={note.data.title} description={note.data.description} lang={note.data.lang === 'zh' ? 'zh-CN' : 'en'}>
+  <main id="main-content" class="container note-page" tabindex="-1">
+    <header class="page-intro note-intro"><a class="back-link" href="/notes/">← Notes</a>
+      {(note.data.date || metadata) && <p class="eyebrow">{note.data.date && <time datetime={note.data.date.toISOString()}>{formatNoteDate(note.data.date)}</time>}{note.data.date && metadata && ' · '}{metadata}</p>}
+      <h1>{note.data.title}</h1><p>{note.data.description}</p>
+    </header>
+    <article class="prose"><slot /></article>
+  </main>
+</BaseLayout>

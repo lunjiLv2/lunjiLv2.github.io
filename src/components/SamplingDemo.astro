@@ -1,0 +1,259 @@
+---
+interface Props { id?: string; }
+const { id = 'gaussian-sampling' } = Astro.props;
+const ratio = 4;
+const angle = 25;
+const radians = angle * Math.PI / 180;
+const scale = 16;
+let seed = 1597;
+function uniform() {
+  seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+  return (seed + .5) / 4294967296;
+}
+const points = Array.from({ length: 240 }, () => {
+  const radius = Math.sqrt(-2 * Math.log(uniform()));
+  const phase = 2 * Math.PI * uniform();
+  const z1 = radius * Math.cos(phase);
+  const z2 = radius * Math.sin(phase);
+  const a = Math.sqrt(ratio) * z1;
+  const b = z2 / Math.sqrt(ratio);
+  return { z1, z2, x: a * Math.cos(radians) - b * Math.sin(radians), y: a * Math.sin(radians) + b * Math.cos(radians) };
+});
+const ticks = [-10, -5, 0, 5, 10];
+---
+
+<gaussian-sampling-demo class="sampling-demo" id={id}>
+  <figure aria-labelledby={`${id}-caption`}>
+    <svg viewBox="0 0 400 400" role="img" aria-labelledby={`${id}-title ${id}-description`}>
+      <title id={`${id}-title`}>Direct samples from a two-dimensional Gaussian</title>
+      <desc id={`${id}-description`}>Dots are independent Gaussian samples. Ellipses are contours at Mahalanobis distances one and two. Both axes use the same fixed scale.</desc>
+      <defs><clipPath id={`${id}-clip`}><rect x="40" y="40" width="320" height="320" /></clipPath></defs>
+      <g class="grid" aria-hidden="true">
+        {ticks.map(tick => (
+          <>
+            <line x1={200 + tick * scale} x2={200 + tick * scale} y1="40" y2="360" />
+            <line y1={200 - tick * scale} y2={200 - tick * scale} x1="40" x2="360" />
+            <text x={200 + tick * scale} y="380" text-anchor="middle">{tick}</text>
+            {tick !== 0 && <text x="32" y={204 - tick * scale} text-anchor="end">{tick}</text>}
+          </>
+        ))}
+      </g>
+      <g class="axes" aria-hidden="true">
+        <line x1="40" x2="360" y1="200" y2="200" />
+        <line y1="40" y2="360" x1="200" x2="200" />
+        <text x="385" y="204" text-anchor="middle">x₁</text>
+        <text x="200" y="22" text-anchor="middle">x₂</text>
+      </g>
+      <g clip-path={`url(#${id}-clip)`}>
+        {[2, 1].map(level => <ellipse class="contour" data-level={level} cx="200" cy="200" rx={scale * level * Math.sqrt(ratio)} ry={scale * level / Math.sqrt(ratio)} transform={`rotate(${-angle} 200 200)`} />)}
+        <g class="samples" data-samples>
+          {points.map((point, index) => <circle data-z1={point.z1} data-z2={point.z2} cx={200 + point.x * scale} cy={200 - point.y * scale} r="2.2" visibility={index < 80 ? 'visible' : 'hidden'} />)}
+        </g>
+      </g>
+    </svg>
+    <figcaption id={`${id}-caption`}>Direct Gaussian samples. The two ellipses show density contours; they are not sample trajectories.</figcaption>
+  </figure>
+  <div class="demo-controls">
+    <div class="slider-row">
+      <label for={`${id}-ratio`}>Standard-deviation ratio</label>
+      <output for={`${id}-ratio`} data-ratio-value>4.0</output>
+      <input id={`${id}-ratio`} data-ratio type="range" min="1" max="8" step="0.1" value={ratio} disabled />
+    </div>
+    <div class="slider-row">
+      <label for={`${id}-angle`}>Rotation</label>
+      <output for={`${id}-angle`} data-angle-value>25°</output>
+      <input id={`${id}-angle`} data-angle type="range" min="0" max="180" step="1" value={angle} disabled />
+    </div>
+    <div class="playback">
+      <button type="button" data-play aria-pressed="false" disabled>Play sampling</button>
+      <button type="button" data-reset disabled>Reset</button>
+      <span><output data-count aria-live="off">80</output> / 240 samples</span>
+    </div>
+    <p class="demo-status" role="status" aria-live="polite" data-status>Change either parameter, or play to reveal more samples.</p>
+  </div>
+  <noscript><p>The static figure remains available. Enable JavaScript to change the distribution or play the demonstration.</p></noscript>
+</gaussian-sampling-demo>
+
+<script>
+  class GaussianSamplingDemo extends HTMLElement {
+    private ratioInput!: HTMLInputElement;
+    private angleInput!: HTMLInputElement;
+    private playButton!: HTMLButtonElement;
+    private resetButton!: HTMLButtonElement;
+    private countOutput!: HTMLOutputElement;
+    private status!: HTMLParagraphElement;
+    private circles: { node: SVGCircleElement; z1: number; z2: number }[] = [];
+    private count = 80;
+    private wantsPlay = false;
+    private onScreen = false;
+    private frame = 0;
+    private lastTime = 0;
+    private remainder = 0;
+    private observer?: IntersectionObserver;
+    private reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    connectedCallback() {
+      this.ratioInput = this.querySelector('[data-ratio]')!;
+      this.angleInput = this.querySelector('[data-angle]')!;
+      this.playButton = this.querySelector('[data-play]')!;
+      this.resetButton = this.querySelector('[data-reset]')!;
+      this.countOutput = this.querySelector('[data-count]')!;
+      this.status = this.querySelector('[data-status]')!;
+      this.ratioInput.disabled = false;
+      this.angleInput.disabled = false;
+      this.resetButton.disabled = false;
+      this.circles = Array.from(this.querySelectorAll<SVGCircleElement>('[data-samples] circle')).map(node => ({ node, z1: Number(node.dataset.z1), z2: Number(node.dataset.z2) }));
+      this.ratioInput.addEventListener('input', this.transform);
+      this.angleInput.addEventListener('input', this.transform);
+      this.playButton.addEventListener('click', this.togglePlay);
+      this.resetButton.addEventListener('click', this.reset);
+      document.addEventListener('visibilitychange', this.updatePlayback);
+      this.reduced.addEventListener('change', this.motionChanged);
+      if ('IntersectionObserver' in window) {
+        this.observer = new IntersectionObserver(entries => {
+          this.onScreen = entries.some(entry => entry.isIntersecting);
+          this.updatePlayback();
+        });
+        this.observer.observe(this);
+      } else this.onScreen = true;
+      this.motionChanged();
+    }
+
+    disconnectedCallback() {
+      this.stopFrame();
+      this.observer?.disconnect();
+      this.ratioInput.removeEventListener('input', this.transform);
+      this.angleInput.removeEventListener('input', this.transform);
+      this.playButton.removeEventListener('click', this.togglePlay);
+      this.resetButton.removeEventListener('click', this.reset);
+      document.removeEventListener('visibilitychange', this.updatePlayback);
+      this.reduced.removeEventListener('change', this.motionChanged);
+    }
+
+    private transform = () => {
+      const ratio = Number(this.ratioInput.value);
+      const angle = Number(this.angleInput.value);
+      const radians = angle * Math.PI / 180;
+      const root = Math.sqrt(ratio);
+      const cosine = Math.cos(radians);
+      const sine = Math.sin(radians);
+      this.querySelector('[data-ratio-value]')!.textContent = ratio.toFixed(1);
+      this.querySelector('[data-angle-value]')!.textContent = `${angle}°`;
+      for (const { node, z1, z2 } of this.circles) {
+        const x = cosine * root * z1 - sine * z2 / root;
+        const y = sine * root * z1 + cosine * z2 / root;
+        node.setAttribute('cx', String(200 + 16 * x));
+        node.setAttribute('cy', String(200 - 16 * y));
+      }
+      for (const ellipse of this.querySelectorAll<SVGEllipseElement>('[data-level]')) {
+        const level = Number(ellipse.dataset.level);
+        ellipse.setAttribute('rx', String(16 * level * root));
+        ellipse.setAttribute('ry', String(16 * level / root));
+        ellipse.setAttribute('transform', `rotate(${-angle} 200 200)`);
+      }
+    };
+
+    private showSamples() {
+      this.circles.forEach(({ node }, index) => node.setAttribute('visibility', index < this.count ? 'visible' : 'hidden'));
+      this.countOutput.value = String(this.count);
+    }
+
+    private togglePlay = () => {
+      if (this.reduced.matches) return;
+      if (this.count === this.circles.length) {
+        this.count = 0;
+        this.remainder = 0;
+        this.showSamples();
+      }
+      this.wantsPlay = !this.wantsPlay;
+      this.status.textContent = this.wantsPlay ? 'Revealing independent samples.' : 'Paused. The samples remain visible.';
+      this.updatePlayback();
+    };
+
+    private reset = () => {
+      this.wantsPlay = false;
+      this.count = this.reduced.matches ? this.circles.length : 80;
+      this.remainder = 0;
+      this.ratioInput.value = '4';
+      this.angleInput.value = '25';
+      this.transform();
+      this.showSamples();
+      this.status.textContent = this.reduced.matches ? 'Showing all samples. Animation is disabled by your reduced-motion preference.' : 'Reset to ratio 4 and rotation 25°. Sampling is paused.';
+      this.updatePlayback();
+    };
+
+    private motionChanged = () => {
+      this.wantsPlay = false;
+      this.playButton.disabled = this.reduced.matches;
+      if (this.reduced.matches) this.count = this.circles.length;
+      this.status.textContent = this.reduced.matches ? 'Showing all samples. Animation is disabled by your reduced-motion preference.' : 'Change either parameter, or play to reveal more samples.';
+      this.showSamples();
+      this.transform();
+      this.updatePlayback();
+    };
+
+    private updatePlayback = () => {
+      this.playButton.setAttribute('aria-pressed', String(this.wantsPlay));
+      this.playButton.textContent = this.reduced.matches ? 'Animation disabled' : this.wantsPlay ? 'Pause' : this.count === this.circles.length ? 'Replay samples' : 'Play sampling';
+      const active = this.wantsPlay && this.onScreen && !document.hidden && !this.reduced.matches;
+      if (active && !this.frame) {
+        this.lastTime = 0;
+        this.frame = requestAnimationFrame(this.animateSamples);
+      } else if (!active) this.stopFrame();
+    };
+
+    private stopFrame() {
+      cancelAnimationFrame(this.frame);
+      this.frame = 0;
+      this.lastTime = 0;
+    }
+
+    private animateSamples = (time: number) => {
+      this.frame = 0;
+      if (!this.wantsPlay || !this.onScreen || document.hidden || this.reduced.matches) return;
+      const elapsed = this.lastTime ? Math.min(100, time - this.lastTime) : 0;
+      this.lastTime = time;
+      this.remainder += elapsed * 18 / 1000;
+      const more = Math.floor(this.remainder);
+      if (more) {
+        this.remainder -= more;
+        this.count = Math.min(this.circles.length, this.count + more);
+        this.showSamples();
+      }
+      if (this.count === this.circles.length) {
+        this.wantsPlay = false;
+        this.status.textContent = 'All 240 samples are visible. Replay to see them arrive again.';
+        this.updatePlayback();
+      } else this.frame = requestAnimationFrame(this.animateSamples);
+    };
+  }
+
+  if (!customElements.get('gaussian-sampling-demo')) customElements.define('gaussian-sampling-demo', GaussianSamplingDemo);
+</script>
+
+<style>
+  .sampling-demo { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(180px, 1fr); align-items: center; gap: 1.5rem; margin: 2rem 0; padding: 1.2rem; border: 1px solid var(--line); background: var(--surface); }
+  figure { margin: 0; min-width: 0; }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .grid line { stroke: var(--line); stroke-width: .6; }
+  .grid text, .axes text { font-size: 14px; fill: var(--muted); font-family: inherit; }
+  .axes line { stroke: var(--muted); stroke-width: .8; opacity: .55; }
+  .contour { fill: var(--accent); fill-opacity: .025; stroke: var(--accent); stroke-opacity: .55; stroke-width: 1.1; }
+  .contour[data-level="2"] { stroke-dasharray: 4 4; }
+  .samples circle { fill: var(--accent); fill-opacity: .6; }
+  figcaption { color: var(--muted); font-size: .82rem; line-height: 1.5; margin-top: .5rem; }
+  .demo-controls { min-width: 0; }
+  .slider-row { display: grid; grid-template-columns: 1fr auto; gap: .4rem; margin-bottom: 1rem; font-size: .85rem; }
+  .slider-row output { color: var(--muted); font-variant-numeric: tabular-nums; }
+  input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); min-height: 28px; margin: 0; }
+  .playback { display: flex; flex-wrap: wrap; gap: .65rem; align-items: center; }
+  button { cursor: pointer; font: inherit; font-size: .83rem; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 3px; min-height: 36px; padding: .4rem .7rem; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { cursor: default; color: var(--muted); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .playback span { flex-basis: 100%; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .demo-status { min-height: 3em; font-size: .8rem; line-height: 1.5; color: var(--muted); margin: .7rem 0 0; }
+  noscript { grid-column: 1 / -1; font-size: .85rem; color: var(--muted); }
+  @media (max-width: 600px) { .sampling-demo { grid-template-columns: minmax(0, 1fr); gap: 1rem; padding: 1rem; } svg { max-width: 360px; margin-inline: auto; } .grid text, .axes text { font-size: 17px; } }
+  @media (max-width: 360px) { .grid text, .axes text { font-size: 20px; } }
+</style>

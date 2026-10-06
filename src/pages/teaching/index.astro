@@ -1,0 +1,50 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { teaching } from '../../data/teaching';
+---
+
+<BaseLayout title="Teaching" description="Courses at UCLA.">
+  <main id="main-content" class="container" tabindex="-1">
+    <header class="page-intro teaching-intro">
+      <p class="eyebrow">Courses</p>
+      <h1>Teaching</h1>
+      <p class="teaching-feedback-link">
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSch9XmSGKZd2EMYIgIvjARI2fXP_JTKmtWf5LPeZ4tGdmXHvQ/viewform?usp=header">Lunji's (anonymous) teaching feedback form</a>
+      </p>
+      <p class="teaching-feedback-note">
+        Feel free to drop any thoughts : )<br />
+        <strong>Please specify which class you are/were in so I can better digest your feedback.</strong>
+      </p>
+    </header>
+    <section aria-labelledby="ucla-teaching">
+      <header class="section-heading">
+        <h2 id="ucla-teaching">At UCLA</h2>
+      </header>
+      <ol class="teaching-list">
+        {teaching.map(course => (
+          <li class="teaching-item" id={course.slug}>
+            <p class="teaching-term">{course.year} {course.term}</p>
+            <div class="teaching-course">
+              <h3 class="teaching-title">
+                <span class="teaching-code">{course.code}</span>{' '}
+                {course.title}
+              </h3>
+              {course.resources.length > 0 && (
+                <ul class="resource-links teaching-resources" aria-label={`Resources for ${course.code}, ${course.year} ${course.term}`}>
+                  {course.resources.map(resource => (
+                    <li class:list={{ 'teaching-resource-pair': resource.answerHref }}>
+                      <a href={resource.href}>{resource.label}</a>
+                      {resource.answerHref && (
+                        <a href={resource.answerHref} aria-label={`Answers for ${resource.label}`}>Answers (PDF)</a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  </main>
+</BaseLayout>
